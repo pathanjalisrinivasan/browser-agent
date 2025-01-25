@@ -70,18 +70,6 @@ Filter and sort the models using Gemini.
 
 Save the top 5 models to a file.
 
-### Project Structure
-
-Here’s an overview of the project structure:
-
-Copy
-browser-agent/
-├── app.py                # Main script for scraping and processing data
-├── .env                  # Environment variables (e.g., Gemini API key)
-├── requirements.txt      # List of dependencies
-├── README.md             # This file
-└── output/               # Directory where results are saved
-
 ### Contributing
 
 If you’d like to contribute to this project, feel free to open an issue or submit a pull request. Your feedback and contributions are welcome!
