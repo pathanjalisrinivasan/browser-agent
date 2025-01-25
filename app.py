@@ -11,7 +11,7 @@ from tenacity import retry, wait_exponential, stop_after_attempt
 from playwright.async_api import async_playwright  # For browser automation
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Load environment variables from .env file
 load_dotenv()
@@ -118,9 +118,21 @@ class Agent:
         parsed_models = self.parse_response(response.text)
         logging.info(f"Parsed models: {parsed_models}")
         
-        # Step 4: Save the parsed models using the controller
-        logging.info("Saving parsed models...")
-        self.controller.execute_action('Save models', {"models": parsed_models})
+        # Step 4: Save the parsed models or raw response if parsing fails
+        if parsed_models:
+            logging.info("Saving parsed models...")
+            self.controller.execute_action('Save models', {"models": parsed_models})
+        else:
+            logging.info("Failed to parse models. Saving raw response...")
+            try:
+                with open('models.txt', 'w') as f:
+                    f.write(response.text)
+                logging.info("Raw response saved to 'models.txt'.")
+            except Exception as e:
+                logging.error(f"Error saving raw response: {e}")
+        
+        # Ensure the script exits after completing the task
+        logging.info("Task execution completed.")
 
     def parse_response(self, response_text):
         """
@@ -139,17 +151,22 @@ class Agent:
                 line = line.split(". ", 1)[-1] if ". " in line else line
                 
                 # Extract the model name and likes from the line
-                if "(" in line and ")" in line:
-                    title = line.split(" (", 1)[0].strip()
-                    likes = line.split(" (", 1)[1].replace(" likes)", "").strip()
+                parts = line.split()
+                if len(parts) >= 2:
+                    title = parts[0].strip()
+                    likes = parts[-2].strip()  # Second last item is the likes count
                     
-                    # Convert likes to integer (handle "k" and "M" suffixes)
-                    if "k" in likes:
-                        likes = int(float(likes.replace("k", "")) * 1000)
-                    elif "M" in likes:
-                        likes = int(float(likes.replace("M", "")) * 1000000)
+                    # Sanitize the likes value by removing non-numeric characters
+                    likes = ''.join(filter(str.isdigit, likes))  # Remove all non-digit characters
+                    
+                    # Convert likes to integer (handle "k" suffix if present)
+                    if likes:  # Ensure likes is not an empty string
+                        if "k" in line.lower():  # Check if the original line contains "k" (case-insensitive)
+                            likes = int(float(likes) * 1000)
+                        else:
+                            likes = int(likes)
                     else:
-                        likes = int(likes)
+                        likes = 0  # Default to 0 if no valid likes value is found
                     
                     # Create a Model object
                     models.append(Model(
@@ -218,4 +235,11 @@ async def main():
     logging.info("Task execution completed.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    print("Script is running...")
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+    except Exception as e:
+        logging.error(f"Error during execution: {e}")
+    finally:
+        loop.close()
